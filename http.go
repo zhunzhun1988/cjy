@@ -65,7 +65,6 @@ func Login(username, password string) (*Client, error) {
 	}
 	url := fmt.Sprintf("%s&inputEmail=%s&inputpassword=%s&rememberpd=keepinfo&version=youwuku&back_url=http%%3A%%2F%%2Fyouwuku.cn%%2Fegou%%2Findex.php%%2Fshangjia%%2Faccount%%3Fver%%3D2&account=&nonce=",
 		server_addr, username, password)
-	fmt.Printf("\nlogin:%s\n", url)
 	res, err := client.client.PostForm(url, nil)
 	if err != nil {
 		return nil, err
@@ -228,8 +227,8 @@ func getFormData(item *UpLoadItem) url.Values {
 	ret["prddata[prdprice]"] = []string{item.Price}
 	ret["prddata[prdnum]"] = []string{item.KuCun}
 	ret["prddata[prdcode]"] = []string{""}
-	ret["prddata[catsname]"] = []string{"e101314", "e101307"}
-	ret["prddata[prdimgs][]"] = []string{item.MajorImage[0]}
+	ret["prddata[catsname]"] = []string{item.Type}
+	ret["prddata[prdimgs][]"] = item.MajorImage
 	ret["prddata[prddesc]"] = []string{UrlEncode(getDetailImageXml(item.DitalImage))}
 	ret["prddata[LogisProvince]"] = []string{"上海"}
 	ret["prddata[LogisCity]"] = []string{"上海市"}
@@ -249,6 +248,7 @@ func getUrlStr(item *UpLoadItem) (string, error) {
 	url += "&prddata[prdnum]=" + item.KuCun
 	url += "&prddata[prdcode]="
 	url += "&prddata[catsname]=,e101314,e101307"
+
 	url += "&prddata[prdimgs][]=" + item.MajorImage[0]
 	url += "&prddata[prddesc]=" + UrlEncode(getDetailImageXml(item.DitalImage))
 	url += "&prddata[LogisProvince]=上海"
@@ -310,7 +310,6 @@ func (c *Client) CreateProduct(item *UpLoadItem) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("code=%d,body=%s\n", ret.Code, ret.Msg)
 	return nil
 
 	/*	if str, err := getUrlStr(item); err != nil {

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -34,10 +36,42 @@ type Config struct {
 	path           string
 	file           *xlsx.File
 	musthaveColume []string
+	productDirs    []string
 	indexMap       map[string]int
+	typeMap        map[string]string
+}
+
+func ReadLine(fileName string, handler func(string)) error {
+	f, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+	buf := bufio.NewReader(f)
+	for {
+		line, err := buf.ReadString('\n')
+		line = strings.TrimSpace(line)
+		handler(line)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (config *Config) lineTypeAdd(line string) {
+	strs := strings.Split(line, ",")
+	if len(strs) == 2 {
+		config.typeMap[strs[1]] = strs[0]
+	}
 }
 
 func checkConfig(config *Config) error {
+	if isFileExist(path.Join(path.Dir(config.path), "type")) == false {
+		return fmt.Errorf("type文件找不到")
+	}
 	if config.file == nil {
 		return fmt.Errorf("无效文件")
 	}
@@ -64,6 +98,11 @@ func checkConfig(config *Config) error {
 	}
 	return fmt.Errorf("未知错位")
 }
+
+func (config *Config) getTypeCode(typeName string) string {
+	code, _ := config.typeMap[typeName]
+	return code
+}
 func (config *Config) isValidColume(name string) bool {
 	for _, n := range config.musthaveColume {
 		if n == name {
@@ -76,9 +115,10 @@ func ReadConfig(filepath string) (*Config, error) {
 	config := &Config{
 		path:           filepath,
 		indexMap:       make(map[string]int),
+		typeMap:        make(map[string]string),
+		productDirs:    getSubDirs(path.Join(path.Dir(filepath), "pic")),
 		musthaveColume: []string{NameIndex, PriceIndex, MessageIndex, KuCunIndex, ProductTypeIndex, ImagePathIndex},
 	}
-
 	file, err := xlsx.OpenFile(filepath)
 	if err != nil {
 		return nil, err
@@ -88,6 +128,9 @@ func ReadConfig(filepath string) (*Config, error) {
 	if errCheck := checkConfig(config); errCheck != nil {
 		return nil, errCheck
 	}
+
+	ReadLine(path.Join(path.Dir(filepath), "type"), config.lineTypeAdd)
+	//ssfmt.Printf("typemap=%v\n", config.typeMap)
 	return config, nil
 }
 
@@ -127,6 +170,27 @@ func (config *Config) IsRowValid(row int) (bool, error) {
 		return false, fmt.Errorf("库存无效")
 	}
 
+	// check image path
+	dirPath := path.Dir(config.path)
+	if imagePathIndex, exist := config.indexMap[ImagePathIndex]; imagePathIndex < 0 || exist == false ||
+		len(config.file.Sheets[0].Rows[row].Cells) <= imagePathIndex ||
+		config.file.Sheets[0].Rows[row].Cells[imagePathIndex].Value == "" {
+		nameIndex, _ := config.indexMap[NameIndex]
+		defaultPath := getDefaultDir(config.productDirs, config.file.Sheets[0].Rows[row].Cells[nameIndex].Value)
+		if isFileExist(defaultPath) == false {
+			return false, fmt.Errorf("图片位置为空")
+		} else {
+			tmpPath := strings.Replace(defaultPath, path.Clean(path.Dir(config.path)), "", -1)
+			if string(tmpPath[0:1]) == "/" || string(tmpPath[0:1]) == "\\" {
+				tmpPath = tmpPath[1:]
+			}
+
+			config.SetImagePath(row, tmpPath)
+		}
+	} else if p := path.Join(dirPath, config.file.Sheets[0].Rows[row].Cells[imagePathIndex].Value); isFileExist(p) == false {
+		return false, fmt.Errorf("图片位置无效")
+	}
+
 	// check type
 	if productTypeIndex, exist := config.indexMap[ProductTypeIndex]; productTypeIndex < 0 || exist == false {
 		return false, fmt.Errorf("商品类型不存在")
@@ -134,21 +198,10 @@ func (config *Config) IsRowValid(row int) (bool, error) {
 		return false, fmt.Errorf("商品类型不存在")
 	} else if config.file.Sheets[0].Rows[row].Cells[productTypeIndex].Value == "" {
 		return false, fmt.Errorf("商品类型为空")
+	} else if config.getTypeCode(config.file.Sheets[0].Rows[row].Cells[productTypeIndex].Value) == "" {
+		return false, fmt.Errorf("未知商品类型[%s]", config.file.Sheets[0].Rows[row].Cells[productTypeIndex].Value)
 	}
 
-	// check image path
-	dirPath := path.Dir(config.path)
-	if imagePathIndex, exist := config.indexMap[ImagePathIndex]; imagePathIndex < 0 || exist == false {
-		fmt.Printf("enter1\n")
-		return false, fmt.Errorf("图片位置不存在")
-	} else if len(config.file.Sheets[0].Rows[row].Cells) <= imagePathIndex {
-		fmt.Printf("enter1\n")
-		return false, fmt.Errorf("图片位置不存在")
-	} else if config.file.Sheets[0].Rows[row].Cells[imagePathIndex].Value == "" {
-		return false, fmt.Errorf("图片位置为空")
-	} else if p := path.Join(dirPath, config.file.Sheets[0].Rows[row].Cells[imagePathIndex].Value); isFileExist(p) == false {
-		return false, fmt.Errorf("图片位置无效")
-	}
 	return true, nil
 }
 
@@ -163,7 +216,15 @@ func (config *Config) GetPrice(row int) (string, error) {
 	if ok, _ := config.IsRowValid(row); ok == false {
 		return "", fmt.Errorf("row %d is invalid", row)
 	}
-	return config.getValue(row, PriceIndex)
+	str, err := config.getValue(row, PriceIndex)
+	if err != nil {
+		return "", err
+	}
+	v, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%.1f", v), nil
 }
 
 func (config *Config) GetMsg(row int) (string, error) {
@@ -193,6 +254,10 @@ func (config *Config) GetImagePath(row int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if p == "" {
+		name, _ := config.GetName(row)
+		p = getDefaultDir(config.productDirs, name)
+	}
 	return path.Join(path.Dir(config.path), p), nil
 }
 
@@ -209,6 +274,20 @@ func (config *Config) getValue(row int, name string) (string, error) {
 		return "", nil
 	}
 	return config.file.Sheets[0].Rows[row].Cells[index].Value, nil
+}
+
+func (config *Config) SetImagePath(row int, path string) error {
+	if len(config.file.Sheets[0].Rows) <= row {
+		return fmt.Errorf("row not exist")
+	}
+	columeNum := len(config.file.Sheets[0].Rows[row].Cells)
+	index, _ := config.indexMap[ImagePathIndex]
+	for i := columeNum; i <= index; i++ {
+		config.file.Sheets[0].Rows[row].AddCell()
+	}
+	config.file.Sheets[0].Rows[row].Cells[index].Value = path
+	err := config.file.Save(config.path)
+	return err
 }
 
 func (config *Config) SetMsg(row int, msg string) error {
@@ -237,7 +316,7 @@ func (config *Config) GetUploadItem(row int) (*UpLoadItem, error) {
 	ret := &UpLoadItem{
 		Name:       name,
 		Price:      price,
-		Type:       productType,
+		Type:       config.getTypeCode(productType),
 		KuCun:      kucun,
 		MajorImage: getMajorImagePaths(imagePath),
 		DitalImage: getDitalImagePaths(imagePath),
@@ -281,6 +360,27 @@ func getDirFiles(dir string) []string {
 		}
 	}
 	return ret
+}
+func getSubDirs(dir string) []string {
+	entries, err := ioutil.ReadDir(dir)
+	ret := make([]string, 0, len(entries))
+	if err != nil {
+		return []string{}
+	}
+	for _, entry := range entries {
+		if entry.IsDir() == true {
+			ret = append(ret, path.Join(dir, entry.Name()))
+		}
+	}
+	return ret
+}
+func getDefaultDir(dirs []string, name string) string {
+	for _, d := range dirs {
+		if strings.Contains(name, path.Base(d)) {
+			return d
+		}
+	}
+	return ""
 }
 
 func isFileExist(p string) bool {

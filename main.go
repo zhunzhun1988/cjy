@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	usename    *string = flag.String("username", "", "login usename")
-	password   *string = flag.String("password", "", "login password")
-	configfile *string = flag.String("configpath", "", "excel path")
-	isDebug    *bool   = flag.Bool("debug", false, "for debug , only create the excel row one")
+	usename    *string = flag.String("username", "15692127531", "login usename")
+	password   *string = flag.String("password", "qwer1234", "login password")
+	configfile *string = flag.String("configpath", "/home/adam/go/src/cjy/excel.xlsx", "excel path")
+	isDebug    *bool   = flag.Bool("debug", true, "for debug , only create the excel row one")
 )
 
 func main() {
@@ -27,7 +27,8 @@ func main() {
 		fmt.Printf("%s,配置excel文件找不到\n", *configfile)
 		os.Exit(-1)
 	}
-	fmt.Printf("用户名： \t%s\n密    码： \t%s\nExcel文件： %s\n", *usename, *password, *configfile)
+	fmt.Printf("用户名： \t%s\n密    码： \t%s\nExcel文件： %s\nisDebug:%t\n",
+		*usename, *password, *configfile, *isDebug)
 
 	// step2 start login server
 	fmt.Printf("开始登录服务器...\n")
@@ -45,12 +46,12 @@ func main() {
 		fmt.Printf("读取excel错误：%v\n", err)
 		os.Exit(-1)
 	}
-
 	// step4 do job
 	rowNum := config.GetRowNum()
-	if isDebug != nil || *isDebug == true {
+	if isDebug != nil && *isDebug == true {
 		rowNum = 1
 	}
+	fmt.Printf("总共有%d行[%d]\n", rowNum, config.GetRowNum())
 	var okNum, errNum, skipNum int
 	for i := 1; i <= rowNum; i++ {
 		fmt.Printf("开始处理行[%03d]: ", i)
