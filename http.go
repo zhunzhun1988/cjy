@@ -266,7 +266,7 @@ func getDetailImageXml(images []string) string {
 	}
 	return string("<p>") + ret + string("</p>")
 }
-func (c *Client) CreateProduct(item *UpLoadItem) error {
+func (c *Client) CreateProduct(item *UpLoadItem, checkOnly bool) error {
 	if len(item.MajorImage) == 0 {
 		return fmt.Errorf("没有定义封面图")
 	} else if len(item.DitalImage) == 0 {
@@ -292,7 +292,9 @@ func (c *Client) CreateProduct(item *UpLoadItem) error {
 	}
 	item.DitalImage = detailImage
 	item.MajorImage = majorImage
-
+	if checkOnly {
+		return nil
+	}
 	res, errPost := c.client.PostForm(create_addr, getFormData(item))
 	if errPost != nil {
 		return errPost

@@ -7,10 +7,11 @@ import (
 )
 
 var (
-	usename    *string = flag.String("username", "15692127531", "login usename")
-	password   *string = flag.String("password", "qwer1234", "login password")
-	configfile *string = flag.String("configpath", "/home/adam/go/src/cjy/excel.xlsx", "excel path")
-	isDebug    *bool   = flag.Bool("debug", true, "for debug , only create the excel row one")
+	usename     *string = flag.String("username", "", "login usename")
+	password    *string = flag.String("password", "", "login password")
+	configfile  *string = flag.String("configpath", "/home/adam/go/src/cjy/excel.xlsx", "excel path")
+	isDebug     *bool   = flag.Bool("debug", true, "for debug , only create the excel row one")
+	isCheckOnly *bool   = flag.Bool("check", true, "for check the excel only")
 )
 
 func main() {
@@ -27,8 +28,8 @@ func main() {
 		fmt.Printf("%s,配置excel文件找不到\n", *configfile)
 		os.Exit(-1)
 	}
-	fmt.Printf("用户名： \t%s\n密    码： \t%s\nExcel文件： %s\nisDebug:%t\n",
-		*usename, *password, *configfile, *isDebug)
+	fmt.Printf("用户名： \t%s\n密    码： \t%s\nExcel文件： %s\n调试:\t%t\n检测：\t%t\n",
+		*usename, *password, *configfile, *isDebug, *isCheckOnly)
 
 	// step2 start login server
 	fmt.Printf("开始登录服务器...\n")
@@ -56,7 +57,7 @@ func main() {
 	for i := 1; i <= rowNum; i++ {
 		fmt.Printf("开始处理行[%03d]: ", i)
 		if ok, err := config.IsRowValid(i); ok == false {
-			fmt.Printf("处理出错（IsRowValid）:%v", i, err)
+			fmt.Printf("处理出错（IsRowValid）:%v", err)
 			config.SetMsg(i, err.Error())
 			errNum++
 		} else if msg, err := config.GetMsg(i); err == nil && msg == "OK" {
@@ -69,14 +70,19 @@ func main() {
 				config.SetMsg(i, err.Error())
 				errNum++
 			} else {
-				errCreate := client.CreateProduct(item)
+				errCreate := client.CreateProduct(item, *isCheckOnly)
 				if errCreate != nil {
 					config.SetMsg(i, errCreate.Error())
 					fmt.Printf("处理出错（CreateProduct）:%v", errCreate)
 					errNum++
 				} else {
-					fmt.Printf("OK")
-					config.SetMsg(i, "OK")
+					if *isCheckOnly {
+						fmt.Printf("Check OK")
+						config.SetMsg(i, "Check OK")
+					} else {
+						fmt.Printf("OK")
+						config.SetMsg(i, "OK")
+					}
 					okNum++
 				}
 			}
