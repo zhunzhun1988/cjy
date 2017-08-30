@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -119,7 +120,7 @@ func (c *Client) DeleteImage(id, image string) error {
 	return nil
 }
 
-func (c *Client) UploadImage(imagepath string) (string, error) {
+func (c *Client) UploadImage(imagepath, imageGroup string) (string, error) {
 	typeStr := getImageTypeStr(imagepath)
 	if typeStr == "" {
 		return "", fmt.Errorf("unknow image type")
@@ -142,7 +143,7 @@ func (c *Client) UploadImage(imagepath string) (string, error) {
 	if fw, err = w.CreateFormField("album"); err != nil {
 		return "", err
 	}
-	if _, err = fw.Write([]byte("35707")); err != nil {
+	if _, err = fw.Write([]byte(imageGroup)); err != nil {
 		return "", err
 	}
 
@@ -266,16 +267,23 @@ func getDetailImageXml(images []string) string {
 	}
 	return string("<p>") + ret + string("</p>")
 }
+
+func getIndexStr() string {
+	strs := []string{"35792", "35793", "35794", "35795", "35796", "35797", "35798", "35799"}
+	tmp := rand.Intn(131)
+	tmp = tmp % len(strs)
+	return strs[tmp]
+}
 func (c *Client) CreateProduct(item *UpLoadItem, checkOnly bool) error {
 	if len(item.MajorImage) == 0 {
 		return fmt.Errorf("没有定义封面图")
 	} else if len(item.DitalImage) == 0 {
 		return fmt.Errorf("没有定义详情图")
 	}
-
+	imageGroup := getIndexStr()
 	majorImage := make([]string, 0, len(item.MajorImage))
 	for _, image := range item.MajorImage {
-		serverUrl, err := c.tryUploadImage(5, image)
+		serverUrl, err := c.tryUploadImage(5, image, imageGroup)
 		if err != nil {
 			return fmt.Errorf("updatel image[%s]:%v", image, err)
 		}
@@ -284,7 +292,7 @@ func (c *Client) CreateProduct(item *UpLoadItem, checkOnly bool) error {
 
 	detailImage := make([]string, 0, len(item.DitalImage))
 	for _, image := range item.DitalImage {
-		serverUrl, err := c.tryUploadImage(5, image)
+		serverUrl, err := c.tryUploadImage(5, image, imageGroup)
 		if err != nil {
 			return fmt.Errorf("updatel image[%s]:%v", image, err)
 		}
@@ -347,10 +355,10 @@ func (c *Client) CreateProduct(item *UpLoadItem, checkOnly bool) error {
 func getMajorImageSuffix(image string) string {
 	return "_800x800.jpg"
 }
-func (c *Client) tryUploadImage(count int, image string) (string, error) {
+func (c *Client) tryUploadImage(count int, image, imageGroup string) (string, error) {
 	var lasterr error
 	for i := 0; i < count; i++ {
-		serverUrl, err := c.UploadImage(image)
+		serverUrl, err := c.UploadImage(image, imageGroup)
 		if err == nil && serverUrl != "" {
 			return serverUrl, err
 		}
