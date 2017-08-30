@@ -328,6 +328,10 @@ func getMajorImagePaths(dir string) []string {
 	files := getDirFiles(dir)
 	filter := make([]string, 0, len(files))
 	for _, f := range files {
+		typeStr := getImageTypeStr(f)
+		if typeStr == "" {
+			continue
+		}
 		name := path.Base(f)
 		if strings.Contains(name, "封面") == true {
 			filter = append(filter, f)
@@ -340,6 +344,10 @@ func getDitalImagePaths(dir string) []string {
 	files := getDirFiles(dir)
 	filter := make([]string, 0, len(files))
 	for _, f := range files {
+		typeStr := getImageTypeStr(f)
+		if typeStr == "" {
+			continue
+		}
 		name := path.Base(f)
 		if strings.Contains(name, "封面") == false {
 			filter = append(filter, f)
