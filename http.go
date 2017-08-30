@@ -15,6 +15,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -268,8 +269,14 @@ func getDetailImageXml(images []string) string {
 	return string("<p>") + ret + string("</p>")
 }
 
+var doOne sync.Once
+
 func getIndexStr() string {
 	strs := []string{"35792", "35793", "35794", "35795", "35796", "35797", "35798", "35799"}
+	doOne.Do(func() {
+		rand.Seed(time.Now().Unix())
+	})
+
 	tmp := rand.Intn(131)
 	tmp = tmp % len(strs)
 	return strs[tmp]
